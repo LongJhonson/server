@@ -1,5 +1,6 @@
 const bcrypt = require("bcrypt");
 const User = require("../models/user");
+const jwt = require("../services/jwt");
 
 function signUp(req, res) {
     console.log(req.body);
@@ -10,7 +11,7 @@ function signUp(req, res) {
 
     user.name = name;
     user.lastname = lastname;
-    user.email = email;
+    user.email = email.toLowerCase();
     user.role = "admin";
     user.active = false;
 
@@ -21,8 +22,8 @@ function signUp(req, res) {
             res.status(404).send({ message: "Las contraseñas no coinciden." });
         } else {
             bcrypt.genSalt(10, (err, salt) => {
-                if(err){
-                    console.log(err);                    
+                if (err) {
+                    console.log(err);
                 }
                 bcrypt.hash(password, salt, function (err, hash) {
                     if (err) {
@@ -31,14 +32,14 @@ function signUp(req, res) {
                         res.status(500).send({ message: "Error al encirptar la contraseña" });
                     } else {
                         user.password = hash;
-                        user.save((err, userStored) =>{
-                            if(err){
-                                res.status(500).send({message: "El usuario ya existe."});
-                            }else{
-                                if(!userStored){
-                                    res.status(404).send({message: "Error al crear el usuario"});
-                                }else{
-                                    res.status(200).send({user: userStored});
+                        user.save((err, userStored) => {
+                            if (err) {
+                                res.status(500).send({ message: "El usuario ya existe." });
+                            } else {
+                                if (!userStored) {
+                                    res.status(404).send({ message: "Error al crear el usuario" });
+                                } else {
+                                    res.status(200).send({ user: userStored });
                                 }
                             }
                         });
@@ -52,6 +53,41 @@ function signUp(req, res) {
     user.password = password;
 }
 
+function signIn(req, res) {
+    const params = req.body;
+    const email = params.email.toLowerCase();
+    const password = params.password;
+
+    User.findOne({ email }, (err, userStored) => {
+        if (err) {
+            res.status(500).send({ message: "Error del servidor" });
+        } else {
+            if (!userStored) {
+                res.status(404).send({ message: "Usuario no encontrado" });
+            } else {
+                bcrypt.compare(password, userStored.password, (err, check) => {
+                    if (err) {
+                        res.status(404).send({ message: "Error del servidor" });
+                    } else if (!check) {
+                        res.status(404).send({ message: "Contraseña incorrecta" });
+                    } else {
+                        if (!userStored.active) {
+                            res.status(200).send({ message: "Usuario inactivo" });
+                        } else {
+                            res.status(200).send({
+                                accessToken: jwt.createAccessToken(userStored),
+                                refresh: jwt.createRefreshToken(userStored)
+                            });
+                        }
+                    }
+                });
+
+            }
+        }
+    })
+}
+
 module.exports = {
-    signUp
+    signUp,
+    signIn
 };

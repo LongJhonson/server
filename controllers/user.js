@@ -130,7 +130,7 @@ function uploadAvatar(req, res) {
                 })
             } else {
                 let user = userData;
-                if(req.files){
+                if (req.files) {
                     let filePath = req.files.avatar.path;
                     console.log(filePath);
                     let fileSplit = filePath.split("/");
@@ -139,23 +139,23 @@ function uploadAvatar(req, res) {
                     let extSplit = filename.split(".");
                     let fileExt = extSplit[1];
 
-                    if(fileExt !== "png" && fileExt !== "jpg"){
+                    if (fileExt !== "png" && fileExt !== "jpg") {
                         res.status(400).send({
                             message: "Formato de imagen no permitida (extensiones permitidas: PNG y JPG"
                         });
-                    }else{//update avatar 
+                    } else {//update avatar 
                         user.avatar = filename;
-                        User.findByIdAndUpdate({_id: params.id}, user, (err, userResult)=>{
-                            if(err){
+                        User.findByIdAndUpdate({ _id: params.id }, user, (err, userResult) => {
+                            if (err) {
                                 res.status(500).send({
                                     message: "Error del servidor"
                                 });
-                            }else{
-                                if(!userResult){
+                            } else {
+                                if (!userResult) {
                                     res.status(404).send({
                                         message: "No se ha encontrado ningun usuario"
                                     });
-                                }else{
+                                } else {
                                     res.status(200).send({
                                         avatarName: filename
                                     })
@@ -169,10 +169,50 @@ function uploadAvatar(req, res) {
     })
 }
 
+function getAvatar(req, res) {
+    const avatarName = req.params.avatarName;
+    const filePath = "./uploads/avatar/" + avatarName;
+    fs.exists(filePath, exists => {
+        if (!exists) {
+            res.status(404).send({
+                message: "El avatar que buscas noi existe"
+            });
+        } else {
+            res.sendFile(path.resolve(filePath));
+        }
+    })
+}
+
+function updateUser(req, res) {
+    const userData = req.body;
+    console.log(userData);
+    const params = req.params;
+
+    User.findByIdAndUpdate({ _id: params.id }, userData, (err, userUpdate) => {
+        if (err) {
+            req.status(500).send({
+                messahe: "Error del servidor"
+            });
+        } else {
+            if (!userUpdate) {
+                res.status(500).send({
+                    message: "No se ha encontrado ningun usuario"
+                });
+            } else {
+                res.status(200).send({
+                    message: "Usuario actualizado correctamente"
+                });
+            }
+        }
+    })
+}
+
 module.exports = {
     signUp,
     signIn,
     getUsers,
     getUsersActive,
-    uploadAvatar
+    uploadAvatar,
+    getAvatar,
+    updateUser
 };

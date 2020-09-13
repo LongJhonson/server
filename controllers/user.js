@@ -6,7 +6,7 @@ const jwt = require("../services/jwt");
 const user = require("../models/user");
 
 function signUp(req, res) {
-    console.log(req.body);
+    // console.log(req.body);
 
     const user = new User();
 
@@ -103,7 +103,7 @@ function getUsers(req, res) {
 }
 
 function getUsersActive(req, res) {
-    console.log(req);
+    // console.log(req);
     const query = req.query;
     User.find({ active: query.active }).then(users => {
         if (!users) {
@@ -132,7 +132,7 @@ function uploadAvatar(req, res) {
                 let user = userData;
                 if (req.files) {
                     let filePath = req.files.avatar.path;
-                    console.log(filePath);
+                    // console.log(filePath);
                     let fileSplit = filePath.split("/");
                     let filename = fileSplit[2];
 
@@ -183,10 +183,28 @@ function getAvatar(req, res) {
     })
 }
 
-function updateUser(req, res) {
+async function hashPassword(password) {
+
+    const saltRounds = 10;
+
+    const hashedPassword = await new Promise((resolve, reject) => {
+        bcrypt.hash(password, saltRounds, function (err, hash) {
+            if (err) reject(err)
+            resolve(hash)
+        });
+    })
+
+    return hashedPassword;
+}
+
+async function updateUser(req, res) {
     let userData = req.body;
     userData.email = req.body.email.toLowerCase();
     const params = req.params;
+
+    if (userData.password) {
+        userData.password = await hashPassword(userData.password);
+    }
 
     User.findByIdAndUpdate({ _id: params.id }, userData, (err, userUpdate) => {
         if (err) {
@@ -199,12 +217,103 @@ function updateUser(req, res) {
                     message: "No se ha encontrado ningun usuario"
                 });
             } else {
+                console.log("user updated");
                 res.status(200).send({
                     message: "Usuario actualizado correctamente"
                 });
             }
         }
     })
+}
+
+async function activateUser(req, res) {
+    const { id } = req.params;
+    const { active } = req.body;
+
+    User.findByIdAndUpdate(id, { active }, (err, userStored) => {
+        if (err) {
+            res.status(500).send({
+                message: "Error del servidor"
+            });
+        } else {
+            if (!userStored) {
+                res.status(404).send({
+                    message: "No se ha encontrado el usuario"
+                });
+            } else {
+                if (active === true) {
+                    res.status(200).send({
+                        message: "Usuario activado correctamente"
+                    });
+                } else {
+                    res.status(200).send({
+                        message: "Usuario desactivado correctamente"
+                    });
+                }
+            }
+        }
+    })
+
+}
+
+function deleteUser(req, res) {
+    const { id } = req.params;
+    user.findByIdAndDelete(id, (err, userDeleted) => {
+        if (err) {
+            res.status(500).send({
+                message: "Error del servidor"
+            });
+        } else {
+            if (!userDeleted) {
+                res.status(404).send({
+                    message: "No se ha encontrado el usuario"
+                });
+            } else {
+                res.status(200).send({
+                    message: "Usuario eliminado correctamente"
+                });
+            }
+        }
+    })
+}
+
+async function signUpAdmin(req, res) {
+    const user = new User();
+
+    const { name, lastname, email, role, password } = req.body;
+    user.name = name;
+    user.lastname = lastname;
+    user.email = email.toLowerCase();
+    user.role = role;
+    user.active = true;
+
+    if (!password) {
+        res.status(500).send({
+            message: "La contraseña es obligatoria"
+        });
+    } else {
+
+        user.password = await hashPassword(password);
+
+        user.save((err, userStored) => {
+            if (err) {
+                res.status(500).send({
+                    message: "Error al crear usuario"
+                });
+            } else {
+                if (!userStored) {
+                    res.status(500).send({
+                        message: "Erroral crear usuario"
+                    });
+                } else {
+                    res.status(200).send({
+                        // user: userStored
+                        message: "Usuario creado correctamente"
+                    });
+                }
+            }
+        })
+    }
 }
 
 module.exports = {
@@ -214,5 +323,8 @@ module.exports = {
     getUsersActive,
     uploadAvatar,
     getAvatar,
-    updateUser
+    updateUser,
+    activateUser,
+    deleteUser,
+    signUpAdmin
 };
